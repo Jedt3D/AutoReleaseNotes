@@ -10,6 +10,7 @@
 ### Session 2026-02-15
 
 - Q: How should the script decide whether a GitHub repo is “reachable”? → A: Public HTTP check only; treat unauthenticated success (200/3xx) as reachable; skip 401/403/404/timeouts.
+- Q: What timeout/retry policy should be used for reachability checks? → A: Use a 5-second timeout per attempt and retry once (at most 2 total attempts) before marking unreachable.
 - Q: In `data/repo/repos.txt`, should the script support comments and whitespace-only lines? → A: Ignore blank/whitespace-only lines and ignore comment lines whose first non-whitespace character is `#`.
 - Q: When deriving the stub Markdown filename, should it use only `repo` or include `owner` too? → A: Include `owner` and `repo` to guarantee uniqueness (use `<owner>__<repo>.md`).
 - Q: When creating a new stub file, what should its initial contents be? → A: Completely empty file (0 bytes).
@@ -62,7 +63,7 @@ As a maintainer, I want to be able to re-run the script without losing any exist
 
 ### User Story 3 - Accept common repo URL formats (Priority: P3)
 
-As a maintainer, I want to paste typical GitHub repo references (URLs or `owner/repo`) so I don't have to normalize them manually.
+As a maintainer, I want to paste GitHub HTTPS repo URLs or `owner/repo` so I don't have to normalize them manually.
 
 **Why this priority**: It reduces friction and prevents input format issues.
 
@@ -107,7 +108,7 @@ As a maintainer, I want to paste typical GitHub repo references (URLs or `owner/
 - **FR-002**: The system MUST ignore blank/whitespace-only lines, MUST ignore comment-only lines whose first non-whitespace character is `#`, and MUST ignore leading/trailing whitespace on repository entries.
 - **FR-002a**: The system MUST accept repository references in either `owner/repo` form or `https://github.com/owner/repo` form. For URL forms, optional trailing `/` and optional `.git` suffix MUST be tolerated.
 - **FR-002b**: The system MUST de-duplicate repository entries by normalized `owner/repo` identity (after trimming and URL normalization) so that each unique repository is processed at most once per run.
-- **FR-003**: The system MUST determine whether a repository is reachable before generating a stub by performing an unauthenticated HTTP request to the GitHub web URL; HTTP success responses (200/3xx) MUST be treated as reachable; HTTP 401/403/404 and network failures/timeouts MUST be treated as unreachable.
+- **FR-003**: The system MUST determine whether a repository is reachable before generating a stub by performing an unauthenticated HTTP request to the GitHub web URL with a 5-second timeout per attempt and a single retry (at most 2 total attempts); HTTP success responses (200/3xx) MUST be treated as reachable; HTTP 401/403/404 and network failures/timeouts after retries MUST be treated as unreachable.
 - **FR-004**: For each reachable repository, the system MUST derive the repository owner and name (the `owner/repo` identity) and use it as the Markdown filename: `data/releases/<owner>__<repo>.md`.
 - **FR-005**: The system MUST create `data/releases/` if it does not already exist.
 - **FR-006**: If the target Markdown file already exists, the system MUST NOT overwrite it.

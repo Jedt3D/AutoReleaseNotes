@@ -1,13 +1,15 @@
-# Implementation Plan: [FEATURE]
+# Implementation Plan: Generate Release Stubs
 
-**Branch**: `[###-feature-name]` | **Date**: [DATE] | **Spec**: [link]
-**Input**: Feature specification from `/specs/[###-feature-name]/spec.md`
+**Branch**: `001-repo-release-stubs` | **Date**: 2026-02-15 | **Spec**: [spec.md](./spec.md)
+**Input**: Feature specification from `/specs/001-repo-release-stubs/spec.md`
 
 **Note**: This template is filled in by the `/speckit.plan` command. See `.specify/templates/commands/plan.md` for the execution workflow.
 
 ## Summary
 
-[Extract from feature spec: primary requirement + technical approach from research]
+Implement a Python CLI-style script that reads `data/repo/repos.txt`, normalizes and de-duplicates GitHub repository references, checks reachability via unauthenticated HTTP (200/3xx reachable), and creates empty stub Markdown files in `data/releases/` named `<owner>__<repo>.md` without overwriting existing files.
+
+Tests should validate behavior by invoking the script as a CLI (subprocess), since the delivered script filename is hyphenated (`scripts/generate-release-stubs.py`) and is not intended to be imported as a module.
 
 ## Technical Context
 
@@ -17,28 +19,34 @@
   the iteration process.
 -->
 
-**Language/Version**: [e.g., Python 3.11, Swift 5.9, Rust 1.75 or NEEDS CLARIFICATION]  
-**Primary Dependencies**: [e.g., FastAPI, UIKit, LLVM or NEEDS CLARIFICATION]  
-**Storage**: [if applicable, e.g., PostgreSQL, CoreData, files or N/A]  
-**Testing**: [e.g., pytest, XCTest, cargo test or NEEDS CLARIFICATION]  
-**Target Platform**: [e.g., Linux server, iOS 15+, WASM or NEEDS CLARIFICATION]
-**Project Type**: [single/web/mobile - determines source structure]  
-**Performance Goals**: [domain-specific, e.g., 1000 req/s, 10k lines/sec, 60 fps or NEEDS CLARIFICATION]  
-**Constraints**: [domain-specific, e.g., <200ms p95, <100MB memory, offline-capable or NEEDS CLARIFICATION]  
-**Scale/Scope**: [domain-specific, e.g., 10k users, 1M LOC, 50 screens or NEEDS CLARIFICATION]
+**Language/Version**: Python 3.14+  
+**Primary Dependencies**: Standard library preferred; add a small HTTP client dependency only if needed (decision documented in research).  
+**Storage**: Files (reads `data/repo/repos.txt`; writes to `data/releases/`).  
+**Testing**: `pytest` (BDD-style) executed via `uv`.  
+**Target Platform**: macOS (local developer machine). 
+**Project Type**: Single CLI-style script + tests.  
+**Performance Goals**: Handle at least 1,000 repositories in a single run without noticeable lag for typical networks.  
+**Constraints**: Must be safe-by-default (no overwrites outside intended output); tolerate network failures/timeouts; deterministic output naming.  
+**Scale/Scope**: Single repository tool; one input file; generates multiple Markdown stubs.
 
 ## Constitution Check
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+- **I. Deterministic, Readable Artifacts**: Pass (naming + behavior deterministic; does not affect PDF rendering directly).
+- **II. Script Portability (macOS-First)**: Pass (Python 3.14+ assumed available; no Bash portability concerns for this feature).
+- **III. Safety by Default (NON-NEGOTIABLE)**: Must pass.
+  - Do not overwrite existing Markdown.
+  - Do not write outside repo root.
+- **IV. Clear Inputs/Outputs and Idempotent Runs**: Must pass (de-dup + skip existing ensures idempotence).
+- **V. Small Changes, Fast Feedback**: Pass (scope limited to generating stubs + tests).
 
 ## Project Structure
 
 ### Documentation (this feature)
 
 ```text
-specs/[###-feature]/
+specs/001-repo-release-stubs/
 ├── plan.md              # This file (/speckit.plan command output)
 ├── research.md          # Phase 0 output (/speckit.plan command)
 ├── data-model.md        # Phase 1 output (/speckit.plan command)
@@ -56,43 +64,20 @@ specs/[###-feature]/
 -->
 
 ```text
-# [REMOVE IF UNUSED] Option 1: Single project (DEFAULT)
-src/
-├── models/
-├── services/
-├── cli/
-└── lib/
+scripts/
+├── convert-releases-to-pdf.sh
+└── generate-release-stubs.py
 
 tests/
-├── contract/
-├── integration/
-└── unit/
+└── test_generate_release_stubs.py
 
-# [REMOVE IF UNUSED] Option 2: Web application (when "frontend" + "backend" detected)
-backend/
-├── src/
-│   ├── models/
-│   ├── services/
-│   └── api/
-└── tests/
-
-frontend/
-├── src/
-│   ├── components/
-│   ├── pages/
-│   └── services/
-└── tests/
-
-# [REMOVE IF UNUSED] Option 3: Mobile + API (when "iOS/Android" detected)
-api/
-└── [same as backend above]
-
-ios/ or android/
-└── [platform-specific structure: feature modules, UI flows, platform tests]
+data/
+├── repo/
+│   └── repos.txt
+└── releases/
 ```
 
-**Structure Decision**: [Document the selected structure and reference the real
-directories captured above]
+**Structure Decision**: Add a single Python script under `scripts/` and a `pytest` test module under `tests/`.
 
 ## Complexity Tracking
 
