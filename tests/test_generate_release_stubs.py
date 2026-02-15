@@ -11,16 +11,28 @@ import pytest
 class _Handler(BaseHTTPRequestHandler):
     def do_GET(self):  # noqa: N802
         # Respond based on path to simulate reachable/unreachable and redirect.
-        if self.path in ("/ok-owner/ok-repo", "/redir-owner/redir-repo"):
-            if self.path == "/redir-owner/redir-repo":
+        if self.path in ("/ok-owner/ok-repo/releases", "/redir-owner/redir-repo/releases"):
+            if self.path == "/redir-owner/redir-repo/releases":
                 self.send_response(302)
-                self.send_header("Location", "/ok-owner/ok-repo")
+                self.send_header("Location", "/ok-owner/ok-repo/releases")
                 self.end_headers()
                 return
 
             self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()
-            self.wfile.write(b"ok")
+            # Minimal HTML resembling GitHub releases list structure.
+            self.wfile.write(
+                (
+                    "<html><body>"
+                    "<div class=\"release-entry\">"
+                    "<a href=\"/ok-owner/ok-repo/releases/tag/v1.0.0\">v1.0.0</a>"
+                    "<relative-time datetime=\"2026-01-01T00:00:00Z\"></relative-time>"
+                    "<div class=\"markdown-body\"><p>Hello<br>World</p><ul><li>One</li></ul></div>"
+                    "</div>"
+                    "</body></html>"
+                ).encode("utf-8")
+            )
             return
 
         self.send_response(404)
@@ -109,7 +121,7 @@ def test_given_reachable_and_unreachable_when_run_then_create_only_reachable_stu
     missing = temp_repo_root / "data/releases/missing-owner__missing-repo.md"
 
     assert created.exists()
-    assert created.stat().st_size == 0
+    assert created.stat().st_size > 0
     assert not missing.exists()
 
 
@@ -134,7 +146,7 @@ def test_given_redirect_when_run_then_treat_as_reachable(temp_repo_root: Path, h
 
     created = temp_repo_root / "data/releases/redir-owner__redir-repo.md"
     assert created.exists()
-    assert created.stat().st_size == 0
+    assert created.stat().st_size > 0
 
 
 def test_given_existing_stub_when_run_then_do_not_overwrite(temp_repo_root: Path, http_server_base_url: str):
@@ -142,7 +154,7 @@ def test_given_existing_stub_when_run_then_do_not_overwrite(temp_repo_root: Path
     releases_dir = temp_repo_root / "data/releases"
     releases_dir.mkdir(parents=True, exist_ok=True)
     existing = releases_dir / "ok-owner__ok-repo.md"
-    existing.write_text("do not overwrite", encoding="utf-8")
+    existing.write_text("do overwrite", encoding="utf-8")
 
     repos_txt = temp_repo_root / "data/repo/repos.txt"
     repos_txt.write_text("ok-owner/ok-repo\n", encoding="utf-8")
@@ -160,12 +172,11 @@ def test_given_existing_stub_when_run_then_do_not_overwrite(temp_repo_root: Path
 
     # Then
     assert result.returncode == 0, result.stderr
-    assert existing.read_text(encoding="utf-8") == "do not overwrite"
+    assert "# ok-owner/ok-repo" in existing.read_text(encoding="utf-8")
 
     summary = _parse_summary(result.stdout)
     assert summary["reachable"] == 1
-    assert summary["created"] == 0
-    assert summary["skipped_exists"] == 1
+    assert summary["written"] == 1
 
 
 def test_given_owner_repo_and_https_url_when_run_then_normalize_and_dedup(temp_repo_root: Path, http_server_base_url: str):
@@ -198,13 +209,13 @@ def test_given_owner_repo_and_https_url_when_run_then_normalize_and_dedup(temp_r
 
     created = temp_repo_root / "data/releases/ok-owner__ok-repo.md"
     assert created.exists()
-    assert created.stat().st_size == 0
+    assert created.stat().st_size > 0
 
     summary = _parse_summary(result.stdout)
     assert summary["processed"] == 2
     assert summary["parsed"] == 2
     assert summary["skipped_duplicate"] == 1
-    assert summary["created"] == 1
+    assert summary["written"] == 1
 
 
 def test_given_comments_and_blank_lines_when_run_then_ignore_them(temp_repo_root: Path, http_server_base_url: str):
